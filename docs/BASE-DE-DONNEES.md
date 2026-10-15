@@ -39,6 +39,10 @@ Le script est réexécutable (`CREATE TABLE IF NOT EXISTS`) et crée 7 tables.
 | `imports` | Historique des imports CSV | fichier, nombres de lignes, importées, doublons, erreurs, rapport JSON |
 | `audit_logs` | Opérations sensibles | connexions, comptes, imports, exports, annulations… |
 | `login_attempts` | Limitation des connexions | échecs par identifiant et par adresse IP |
+| `app_state` | État de la synchronisation avec le site | date et résultat du dernier chargement des billets |
+
+Billets venant du site : `tickets.external_id` (identifiant sur le site), `places`, `birth_date`, `member_hash` (empreinte du jeton
+de carte de membre), `cancel_reason` (`perte`, `annulation`, `supprimé`), `site_pending` (présence à renvoyer au site).
 
 Intégrité : clés étrangères entre billets, événements, comptes, imports et journaux ; index sur les recherches fréquentes
 (statut par événement, historique par date, contrôleur, événement) ; contrainte `chk_tickets_used` (un billet « utilisé » a

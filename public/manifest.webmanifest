@@ -4,7 +4,7 @@
   "start_url": "/scan.php",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#050507",
-  "theme_color": "#050507",
+  "background_color": "#f4f5f8",
+  "theme_color": "#ffffff",
   "icons": [{ "src": "/assets/img/logo.webp", "sizes": "512x512", "type": "image/webp" }]
 }

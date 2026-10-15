@@ -29,6 +29,16 @@ return [
     // Le changer invalide la signature des QR codes déjà distribués (la saisie manuelle du code reste possible).
     'qr_secret' => 'REMPLACER_PAR_64_CARACTERES_HEXADECIMAUX_ALEATOIRES',
 
+    // Lien avec le site lesdamesduparc.com : les billets vendus sur le site sont chargés dans l'application, et chaque entrée validée
+    // est enregistrée comme « présente » sur le site. La clé doit être identique à SCANNER_API_KEY dans la configuration du site
+    // (64 caractères aléatoires : openssl rand -hex 32). Laisser 'url' vide pour utiliser l'application sans le site.
+    'site' => [
+        'url'          => 'https://lesdamesduparc.com',
+        'api_key'      => 'REMPLACER_PAR_LA_CLE_SCANNER_API_KEY_DU_SITE',
+        'sync_seconds' => 30,   // délai minimal entre deux chargements des billets du site
+        'timeout'      => 6,    // secondes
+    ],
+
     // Session
     'session' => [
         'name'            => 'DDPCTRL',

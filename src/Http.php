@@ -64,6 +64,39 @@ final class Http
         exit;
     }
 
+    /**
+     * Envoie la réponse JSON tout de suite, puis exécute $after (ex. transmettre une présence au site) sans faire attendre le
+     * navigateur.
+     */
+    public static function jsonThen(array $data, int $status, callable $after): never
+    {
+        $body = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        ignore_user_abort(true);
+        if (!headers_sent()) {
+            http_response_code($status);
+            header('Content-Type: application/json; charset=utf-8');
+            header('Cache-Control: no-store');
+            header('Content-Length: ' . strlen((string) $body));
+            header('Connection: close');
+            self::securityHeaders();
+        }
+        echo $body;
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } else {
+            while (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            flush();
+        }
+        try {
+            $after();
+        } catch (\Throwable $e) {
+            Log::error('Traitement après réponse impossible', ['error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public static function fail(string $message, int $status = 400, array $extra = []): never
     {
         self::json(['ok' => false, 'error' => $message] + $extra, $status);

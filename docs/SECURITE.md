@@ -19,11 +19,14 @@
 | Fichiers | seul `public/` est servi ; `config/`, `src/`, `storage/`, `database/`, `bin/`, `tests/`, `templates/` protégés par `.htaccess` ; fichiers cachés et extensions sensibles refusés ; secrets uniquement dans `config/config.php` (non versionné) |
 | En-têtes HTTP | CSP, `X-Frame-Options: DENY` et `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` (caméra uniquement pour le site), HSTS en HTTPS, version de PHP masquée, `noindex` |
 | Journalisation | `audit_logs` : connexions, blocages, comptes, imports, exports, impressions, annulations et remises à zéro de billets ; `check_logs` : chaque tentative de contrôle (le code complet d'un billet inconnu n'est jamais stocké : 4 premiers caractères et empreinte SHA-256) |
-| Données personnelles | seuls le nom du titulaire et une référence facultative sont stockés ; aucune donnée de paiement |
+| Lien avec le site | clé partagée d'au moins 32 caractères (`SCANNER_API_KEY`), comparée en temps constant par le site ; uniquement en HTTPS ; le site ne transmet que ce qui sert au contrôle (nom, date de naissance, n° de membre, places, empreinte du jeton de carte de membre) |
+| Billets sur le téléphone | la liste chargée sur le téléphone contient des **empreintes** SHA-256 des codes, jamais les codes : elle ne permet pas de fabriquer un billet. L'affichage anticipé du nom n'est qu'un aperçu : **la décision est toujours celle du serveur** |
+| Données personnelles | nom du titulaire, référence facultative et, pour les billets du site, date de naissance, n° de membre et nombre de places ; aucune donnée de paiement |
 
 ## Liste de vérification avant la mise en production
 
 - [ ] HTTPS actif, redirection `http://` → `https://`, certificat valide
+- [ ] Même clé `SCANNER_API_KEY` sur le site et dans `config/config.php` (`site.api_key`), jamais communiquée par e-mail en clair
 - [ ] `config/config.php` : `debug => false`, `session.secure_cookie => true`, `qr_secret` aléatoire (64 caractères hexadécimaux), `install_token => ''`
 - [ ] `/config/config.php`, `/src/App.php`, `/storage/` répondent 403 ou 404
 - [ ] Compte MariaDB dédié, mot de passe long, droits limités à la base

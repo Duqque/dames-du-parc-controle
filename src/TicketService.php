@@ -22,13 +22,43 @@ final class TicketService
     /**
      * @return array{result:string, message:string, ticket?:array, used_at?:string|null, used_by?:string|null}
      */
-    public static function validate(string $raw, int $controllerId, ?int $eventId, string $method): array
+    public static function validate(string $raw, int $controllerId, ?int $eventId, string $method, ?int $ticketId = null): array
     {
-        $method = $method === 'manual' ? 'manual' : 'scan';
+        $method = in_array($method, ['manual', 'list'], true) ? $method : 'scan';
         $hint = TicketCode::hint($raw);
         $hash = hash('sha256', trim($raw));
-        $parsed = TicketCode::parse($raw);
         $db = App::db();
+
+        // Contrôle depuis la liste des participantes (billet oublié, téléphone déchargé…) : par le numéro interne du billet.
+        if ($ticketId !== null) {
+            $st = $db->prepare('SELECT token FROM tickets WHERE id = ?');
+            $st->execute([$ticketId]);
+            $token = $st->fetchColumn();
+            if ($token === false) {
+                self::log(null, $eventId, $controllerId, 'invalid', $method, '#' . $ticketId, $hash);
+                return ['result' => 'invalid', 'message' => 'Billet introuvable.'];
+            }
+            $raw = (string) $token;
+            $hint = TicketCode::hint($raw);
+        }
+
+        // QR code de la carte de membre (lien « …/verification/<jeton> ») : billet de cette adhérente pour l'événement contrôlé.
+        if (preg_match('~/verification/([A-Za-z0-9_-]{8,128})(?:[/?#]|$)~', $raw, $m)) {
+            if ($eventId === null) {
+                self::log(null, null, $controllerId, 'invalid', $method, 'carte', $hash);
+                return ['result' => 'invalid', 'message' => 'Carte de membre : choisissez d\'abord l\'événement contrôlé.'];
+            }
+            $st = $db->prepare("SELECT token FROM tickets WHERE member_hash = ? AND event_id = ? ORDER BY FIELD(status, 'valid', 'used', 'cancelled'), id DESC LIMIT 1");
+            $st->execute([hash('sha256', $m[1]), $eventId]);
+            $token = $st->fetchColumn();
+            if ($token === false) {
+                self::log(null, $eventId, $controllerId, 'invalid', $method, 'carte', $hash);
+                return ['result' => 'invalid', 'message' => 'Carte de membre reconnue, mais aucun billet pour cet événement.'];
+            }
+            $raw = (string) $token;
+            $hint = 'carte';
+        }
+        $parsed = TicketCode::parse($raw);
 
         if ($parsed['error'] !== null || $parsed['token'] === null) {
             self::log(null, $eventId, $controllerId, 'invalid', $method, $hint, $hash);
@@ -76,7 +106,7 @@ final class TicketService
     {
             $db->beginTransaction();
             $st = $db->prepare(
-                'SELECT t.id, t.token, t.event_id, t.holder_name, t.reference, t.status, t.used_at, t.used_by, u.display_name AS used_by_name, e.name AS event_name, e.starts_at
+                'SELECT t.id, t.token, t.event_id, t.holder_name, t.reference, t.places, t.birth_date, t.external_id, t.status, t.cancel_reason, t.used_at, t.used_by, u.display_name AS used_by_name, e.name AS event_name, e.starts_at
                    FROM tickets t
                    JOIN events e ON e.id = t.event_id
                    LEFT JOIN users u ON u.id = t.used_by
@@ -102,7 +132,13 @@ final class TicketService
             if ($t['status'] === 'cancelled') {
                 self::log($ticketId, $eventId, $controllerId, 'cancelled', $method, $hint, $hash);
                 $db->commit();
-                return ['result' => 'cancelled', 'message' => 'Billet annulé : accès refusé.', 'ticket' => $public];
+                $why = match ($t['cancel_reason']) {
+                    'perte' => 'Billet remplacé : un nouveau billet a été émis après une perte. Seul le nouveau billet est valable.',
+                    'annulation' => 'Billet annulé par la participante : accès refusé.',
+                    'supprimé' => 'Inscription supprimée par l\'équipe : accès refusé.',
+                    default => 'Billet annulé : accès refusé.',
+                };
+                return ['result' => 'cancelled', 'message' => $why, 'ticket' => $public];
             }
             if ($t['status'] === 'used') {
                 self::log($ticketId, $eventId, $controllerId, 'already_used', $method, $hint, $hash);
@@ -111,7 +147,8 @@ final class TicketService
             }
 
             // Passage atomique valid → used : la condition sur le statut garantit qu'une seule validation peut réussir.
-            $up = $db->prepare("UPDATE tickets SET status = 'used', used_at = UTC_TIMESTAMP(), used_by = ? WHERE id = ? AND status = 'valid'");
+            // site_pending : la présence sera transmise à lesdamesduparc.com juste après la réponse (billets venant du site).
+            $up = $db->prepare("UPDATE tickets SET status = 'used', used_at = UTC_TIMESTAMP(), used_by = ?, site_pending = (external_id IS NOT NULL) WHERE id = ? AND status = 'valid'");
             $up->execute([$controllerId, $ticketId]);
             if ($up->rowCount() !== 1) {
                 throw new \RuntimeException('Mise à jour du billet non appliquée.');
@@ -141,6 +178,9 @@ final class TicketService
             'id'          => (int) $t['id'],
             'holder_name' => $t['holder_name'],
             'reference'   => $t['reference'],
+            'places'      => (int) ($t['places'] ?? 1),
+            'birth_date'  => !empty($t['birth_date']) ? date('d/m/Y', strtotime((string) $t['birth_date'])) : null,
+            'from_site'   => !empty($t['external_id']),
             'event_id'    => (int) $t['event_id'],
             'event_name'  => $t['event_name'] ?? null,
             'event_date'  => isset($t['starts_at']) ? App::localTime($t['starts_at'], 'd/m/Y H:i') : null,

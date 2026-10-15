@@ -21,13 +21,13 @@ $nav = $user && $user['role'] === 'admin' ? [
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#050507">
+<meta name="theme-color" content="#ffffff">
 <meta name="robots" content="noindex, nofollow">
 <meta name="csrf-token" content="<?= $e(Auth::csrfToken()) ?>">
 <title><?= $e($title) ?> · Contrôle des billets · Les Dames du Parc</title>
 <link rel="icon" href="/assets/img/logo.webp">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="stylesheet" href="/assets/css/app.css?v=3">
+<link rel="stylesheet" href="/assets/css/app.css?v=4">
 </head>
 <body class="page-<?= $e($page) ?>" data-page="<?= $e($page) ?>">
 <a class="skip" href="#main">Aller au contenu</a>
@@ -54,9 +54,9 @@ $nav = $user && $user['role'] === 'admin' ? [
 <?php $content(); ?>
 </main>
 <div class="toast" role="status" aria-live="polite" hidden></div>
-<script src="/assets/js/common.js?v=3"></script>
+<script src="/assets/js/common.js?v=4"></script>
 <?php foreach ($scripts ?? [] as $s): ?>
-<script src="/assets/js/<?= $e($s) ?>?v=3"></script>
+<script src="/assets/js/<?= $e($s) ?>?v=4"></script>
 <?php endforeach; ?>
 </body>
 </html>

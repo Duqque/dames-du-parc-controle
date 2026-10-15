@@ -12,7 +12,7 @@ Le script crée ses propres comptes, événements et billets (préfixe `test-`),
 (requêtes HTTP vers Apache, plusieurs sessions de contrôleurs, requêtes simultanées), vérifie le résultat dans MariaDB, puis
 supprime ses données. Code de sortie 0 si tout est conforme.
 
-## Ce qui est vérifié (87 contrôles)
+## Ce qui est vérifié (110 contrôles)
 
 | Domaine | Vérifications |
 |---|---|
@@ -28,23 +28,28 @@ supprime ses données. Code de sortie 0 si tout est conforme.
 | Import CSV | importés / générés / doublons (fichier et base) / lignes incorrectes, rapport ligne par ligne ; réimport ; `.php`, binaire déguisé, fichier vide, en-tête inconnu refusés ; import interdit aux contrôleurs |
 | Export CSV | formules neutralisées ; export de l'historique |
 | Comptes | mot de passe faible refusé ; mot de passe haché ; désactivation immédiate (session ouverte comprise) ; pas d'auto-suppression |
+| Lien avec le site | (faux site de test `tests/fake-site.php`) chargement des événements et billets ; code-barres à 12 chiffres validé ; second scan « déjà utilisé » ; billet annulé ou remplacé (perte) sur le site, y compris entre deux chargements ; présence déjà relevée sur le site ; billet acheté à la dernière minute validé au premier scan ; entrée validée → présence transmise au site ; site indisponible → entrée validée, présence mise en attente puis rejouée ; QR code de carte de membre (avec et sans billet) ; validation depuis la liste ; historique « Mes contrôles » ; cache par empreintes |
 | Panne | base indisponible → « erreur technique », accès non autorisé |
 | En-têtes | CSP, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy ; version de PHP masquée ; fichiers cachés refusés |
 
 ## Résultats obtenus avant livraison
 
-- Apache 2.4.69 + PHP 8.5 + MariaDB 13 : **87 réussis, 0 échoué**.
+- Apache 2.4.69 + PHP 8.5 + MariaDB 13 : **110 réussis, 0 échoué**.
+- Site (`scripts/payments/test.sh` du dépôt du site) : 9 tests des points d'accès `/api/scanner/*` (sans clé, mauvaise clé, liste des billets, présence,
+  double présence, code inconnu, billet annulé, journal d'activité).
 - PHP 8.2.34 (serveur intégré de PHP, pour la compatibilité) : 86 réussis ; le seul écart, attendu, est la protection des
   fichiers cachés, assurée par `.htaccess` sous Apache et non par le serveur intégré de PHP.
 - Racine du site sur le dossier du projet (hébergement mutualisé) : `config/`, `src/`, `storage/`, `database/`, `bin/`, `tests/`,
   `templates/`, `.git/` refusés (403), application fonctionnelle.
-- Lecture des QR codes : QR généré par l'application relu à l'identique par le détecteur natif (Chrome) et par jsQR (iPhone).
+- Lecture des codes : code-barres Code 128 des billets du site relu par le lecteur dédié sur des photos de billets (écran,
+  fond sombre, inclinaison, flou léger), sans aucune lecture erronée ; parcours iPhone simulé (caméra → résultat) en ~1 s.
+  QR codes relus par ZXing.
 - Installation : page `install.php` (jeton), `bin/create-admin.php`, sauvegarde puis restauration vérifiées.
 
 ## Tests manuels sur téléphone (à faire sur le serveur HTTPS)
 
-1. Android (Chrome) et iPhone (Safari) : connexion, autorisation de la caméra, scan d'un QR code affiché sur un autre écran, puis
-   imprimé (Administration > Billets > Imprimer les QR codes).
+1. Android (Chrome) et iPhone (Safari) : connexion, autorisation de la caméra, scan du code-barres d'un billet électronique du
+   site affiché sur un autre téléphone, puis imprimé ; vérifier la présence dans l'administration du site.
 2. Refuser l'accès à la caméra : l'application bascule sur la saisie manuelle.
 3. Deux téléphones scannent le même billet en même temps : un seul écran vert.
 4. Couper le réseau du téléphone et scanner : écran gris « erreur technique » (accès non autorisé).

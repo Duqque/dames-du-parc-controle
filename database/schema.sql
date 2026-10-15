@@ -34,10 +34,13 @@ CREATE TABLE IF NOT EXISTS events (
   name            VARCHAR(160)     NOT NULL,
   starts_at       DATETIME         NOT NULL,
   location        VARCHAR(200)     NULL,
+  address         VARCHAR(255)     NULL,
+  external_id     VARCHAR(80)      NULL COMMENT 'Identifiant de l''événement sur lesdamesduparc.com (synchronisation)',
   is_active       TINYINT(1)       NOT NULL DEFAULT 1,
   created_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_events_external (external_id),
   KEY idx_events_starts_at (starts_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -70,14 +73,24 @@ CREATE TABLE IF NOT EXISTS tickets (
   event_id        INT UNSIGNED     NOT NULL,
   holder_name     VARCHAR(160)     NULL,
   reference       VARCHAR(80)      NULL COMMENT 'Référence externe (n° de commande, de membre…)',
+  places          SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+  birth_date      DATE             NULL,
+  member_hash     CHAR(64)         CHARACTER SET ascii NULL COMMENT 'SHA-256 du jeton de la carte de membre (contrôle par le QR code de la carte)',
+  external_id     VARCHAR(64)      NULL COMMENT 'Inscription correspondante sur lesdamesduparc.com',
   status          ENUM('valid','used','cancelled') NOT NULL DEFAULT 'valid',
+  cancel_reason   VARCHAR(40)      NULL COMMENT 'perte (billet remplacé), annulation, supprimé…',
   created_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
   used_at         DATETIME         NULL,
   used_by         INT UNSIGNED     NULL COMMENT 'Contrôleur ayant validé l''entrée',
   cancelled_at    DATETIME         NULL,
   import_id       INT UNSIGNED     NULL,
+  site_pending    TINYINT(1)       NOT NULL DEFAULT 0 COMMENT '1 : présence à transmettre au site',
+  site_error      VARCHAR(255)     NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_tickets_token (token),
+  KEY idx_tickets_member (member_hash),
+  KEY idx_tickets_external (external_id),
+  KEY idx_tickets_pending (site_pending),
   KEY idx_tickets_event_status (event_id, status),
   KEY idx_tickets_reference (reference),
   CONSTRAINT fk_tickets_event  FOREIGN KEY (event_id)  REFERENCES events (id)  ON DELETE RESTRICT,
@@ -95,7 +108,7 @@ CREATE TABLE IF NOT EXISTS check_logs (
   event_id        INT UNSIGNED     NULL COMMENT 'Événement contrôlé à l''entrée',
   user_id         INT UNSIGNED     NULL,
   result          ENUM('valid','already_used','invalid','cancelled','wrong_event','error') NOT NULL,
-  method          ENUM('scan','manual') NOT NULL DEFAULT 'scan',
+  method          ENUM('scan','manual','list') NOT NULL DEFAULT 'scan',
   code_hint       VARCHAR(16)      NULL COMMENT 'Début du code présenté (jamais le code complet d''un billet inconnu)',
   code_hash       CHAR(64)         CHARACTER SET ascii NULL COMMENT 'SHA-256 du code présenté',
   ip_address      VARCHAR(45)      NULL,
@@ -140,4 +153,14 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   PRIMARY KEY (id),
   KEY idx_login_user (username, attempted_at),
   KEY idx_login_ip (ip_address, attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- État de l'application (dernière synchronisation avec le site…)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS app_state (
+  k               VARCHAR(60)      NOT NULL,
+  v               TEXT             NULL,
+  updated_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (k)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

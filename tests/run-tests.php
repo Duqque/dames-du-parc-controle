@@ -94,7 +94,15 @@ $other = TicketService::create($otherEventId, 1)[0];
 $next = 0;
 $take = function () use (&$next, $tk) { return $tk[$next++]; };
 
-$cleanup = function () use ($db, $ids, $eventId, $otherEventId, $suffix) {
+$cleanup = function () use ($ids, $eventId, $otherEventId, $suffix) {
+  try {
+    App::resetDb();
+    $db = App::db();
+    foreach ($db->query("SELECT id FROM events WHERE external_id = " . $db->quote("site-evt-$suffix"))->fetchAll(PDO::FETCH_COLUMN) as $sid) {
+        $db->prepare('DELETE FROM check_logs WHERE event_id = ?')->execute([$sid]);
+        $db->prepare('DELETE FROM tickets WHERE event_id = ?')->execute([$sid]);
+        $db->prepare('DELETE FROM events WHERE id = ?')->execute([$sid]);
+    }
     $db->prepare('DELETE c FROM check_logs c JOIN tickets t ON t.id = c.ticket_id WHERE t.event_id IN (?, ?)')->execute([$eventId, $otherEventId]);
     $db->prepare('DELETE FROM check_logs WHERE event_id IN (?, ?) OR user_id IN (?, ?, ?)')->execute([$eventId, $otherEventId, $ids['admin'], $ids['ctrl1'], $ids['ctrl2']]);
     $db->prepare('DELETE FROM tickets WHERE event_id IN (?, ?)')->execute([$eventId, $otherEventId]);
@@ -103,6 +111,9 @@ $cleanup = function () use ($db, $ids, $eventId, $otherEventId, $suffix) {
     $db->prepare("DELETE FROM audit_logs WHERE target LIKE ? OR user_id IN (?, ?, ?)")->execute(["%$suffix%", $ids['admin'], $ids['ctrl1'], $ids['ctrl2']]);
     $db->prepare('DELETE FROM users WHERE username LIKE ?')->execute(["test-%-$suffix"]);
     $db->prepare('DELETE FROM login_attempts WHERE username LIKE ?')->execute(["test-%-$suffix"]);
+  } catch (Throwable $e) {
+    echo "\n  (nettoyage incomplet : " . $e->getMessage() . ")\n";
+  }
 };
 register_shutdown_function($cleanup);
 
@@ -342,6 +353,111 @@ ok($n->req('GET', '/api/ticket-status.php?code=' . $tk[0]['token'])['status'] ==
 ok((new Client($BASE, '10.0.3.2'))->login("test-new-$suffix", $pw)['status'] === 401, 'Compte désactivé : connexion refusée');
 ok($admin->req('POST', '/api/users.php', ['action' => 'delete', 'id' => $ids['admin']])['status'] === 409, 'Un administrateur ne peut pas supprimer son propre compte');
 ok($admin->req('POST', '/api/users.php', ['action' => 'delete', 'id' => $newId])['status'] === 200, 'Suppression d\'un compte');
+
+section('Lien avec lesdamesduparc.com');
+$siteUrl = (string) App::config('site.url', '');
+if (!preg_match('#^http://127\.0\.0\.1:(\d+)$#', $siteUrl, $mm)) {
+    echo "  (ignoré : site.url doit pointer vers le faux site local http://127.0.0.1:<port> pour ce test)\n";
+} else {
+    $stateFile = APP_ROOT . "/storage/tmp/fake-site-$suffix.json";
+    $proc = proc_open([PHP_BINARY, '-S', '127.0.0.1:' . $mm[1], APP_ROOT . '/tests/fake-site.php'], [0 => ['pipe', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, null, ['FAKE_SITE_STATE' => $stateFile, 'FAKE_SITE_KEY' => (string) App::config('site.api_key')] + getenv());
+    usleep(400000);
+    $fake = function (?array $set = null) use ($siteUrl) {
+        $ctx = stream_context_create(['http' => ['method' => $set ? 'POST' : 'GET', 'header' => 'Content-Type: application/json', 'content' => $set ? json_encode($set) : '']]);
+        return json_decode((string) file_get_contents("$siteUrl/__state", false, $ctx), true);
+    };
+    $code = fn (int $n) => sprintf('7%05d%06d', random_int(0, 99999), $n);
+    $ext = "site-evt-$suffix";
+    $memberToken = "membre-$suffix-abcdef";
+    $C = [];
+    foreach (range(1, 9) as $n) $C[$n] = $code($n);
+    $old2 = $code(20);
+    $tick = fn (int $n, array $extra = []) => $extra + ['id' => "reg-$n", 'event' => $ext, 'code' => $C[$n], 'status' => 'valid', 'holder' => "Participante $n", 'birthDate' => '1995-05-1' . ($n % 10), 'memberNumber' => "MBR$n", 'member' => null, 'places' => 1, 'attended' => false, 'attendedAt' => null];
+    $state = [
+        'events' => [['id' => $ext, 'title' => "Soirée test $suffix", 'date' => gmdate('Y-m-d', time() + 86400), 'time' => '20:00', 'venue' => 'Salle test', 'address' => '1 rue du Test', 'city' => 'Paris']],
+        'tickets' => [$tick(1), $tick(2, ['member' => hash('sha256', $memberToken)]), $tick(3, ['status' => 'cancelled']), $tick(4, ['attended' => true, 'attendedAt' => gmdate('c', time() - 600)]), $tick(6), $tick(7), $tick(8), $tick(9)],
+        'revoked' => [['id' => 'reg-2', 'event' => $ext, 'code' => $old2, 'reason' => 'perte', 'at' => gmdate('c'), 'holder' => 'Participante 2']],
+        'down' => false,
+    ];
+    $fake($state);
+    $r = $c1->req('POST', '/api/sync.php', []);
+    ok($r['status'] === 200 && ($r['data']['ok'] ?? false), 'Synchronisation : billets du site chargés', json_encode($r['data']));
+    $siteEventId = (int) $db->query('SELECT id FROM events WHERE external_id = ' . $db->quote($ext))->fetchColumn();
+    $st = fn (string $c) => $db->query('SELECT status, cancel_reason, site_pending FROM tickets WHERE token = ' . $db->quote($c))->fetch();
+    ok($siteEventId > 0 && $st($C[1])['status'] === 'valid', 'Événement et billets du site créés dans l\'application');
+    ok($st($C[3])['status'] === 'cancelled' && $st($C[3])['cancel_reason'] === 'annulation', 'Billet annulé sur le site : annulé ici');
+    ok($st($old2)['status'] === 'cancelled' && $st($old2)['cancel_reason'] === 'perte', 'Ancien code remplacé (perte) : annulé ici');
+    ok($st($C[4])['status'] === 'used', 'Présence déjà relevée sur le site : billet déjà consommé ici');
+
+    $r = $c1->req('GET', '/api/tickets-cache.php?event_id=' . $siteEventId);
+    $hashes = array_column($r['data']['tickets'] ?? [], 'h');
+    ok($r['status'] === 200 && in_array(hash('sha256', $C[1]), $hashes, true) && !str_contains($r['body'], $C[1]), 'Ouverture de l\'application : tous les billets chargés (empreintes, jamais les codes)');
+    ok(($r['data']['counts'] ?? []) === ['total' => 8, 'present' => 1, 'absent' => 6, 'cancelled' => 1], 'Compteurs présentes / absentes / annulés (ancien code remplacé non compté)', json_encode($r['data']['counts'] ?? null));
+    ok($c1->req('GET', '/api/tickets-cache.php')['status'] === 200 && $anon->req('GET', '/api/tickets-cache.php')['status'] === 401, 'Chargement des billets réservé aux comptes connectés');
+
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['code' => implode(' ', str_split($C[1], 4)), 'event_id' => $siteEventId, 'method' => 'scan']);
+    ok(($r['data']['result'] ?? '') === 'valid' && ($r['data']['ticket']['birth_date'] ?? '') !== '' && ($r['data']['site'] ?? '') === 'pending', 'Code-barres du site (12 chiffres) : billet valide, date de naissance affichée', json_encode($r['data']));
+    usleep(500000);
+    $f = $fake();
+    $checked = array_column($f['checkins'] ?? [], 'code');
+    ok(in_array($C[1], $checked, true) && ($f['checkins'][0]['controller'] ?? '') === 'Test ctrl1', 'Présence transmise au site après la réponse (« présente » sur lesdamesduparc.com)');
+    ok((int) $st($C[1])['site_pending'] === 0, 'Présence marquée comme transmise');
+    $r = $c2->req('POST', '/api/validate-ticket.php', ['code' => $C[1], 'event_id' => $siteEventId]);
+    ok(($r['data']['result'] ?? '') === 'already_used', 'Second scan du billet du site : déjà utilisé');
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['code' => $old2, 'event_id' => $siteEventId]);
+    ok(($r['data']['result'] ?? '') === 'cancelled' && str_contains($r['data']['message'] ?? '', 'remplacé'), 'Ancien billet remplacé après une perte : refusé avec le motif', $r['data']['message'] ?? '');
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['code' => $C[3], 'event_id' => $siteEventId]);
+    ok(($r['data']['result'] ?? '') === 'cancelled' && str_contains($r['data']['message'] ?? '', 'participante'), 'Billet annulé par la participante : refusé avec le motif');
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['code' => $C[4], 'event_id' => $siteEventId]);
+    ok(($r['data']['result'] ?? '') === 'already_used', 'Billet déjà pointé sur le site : déjà utilisé');
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['code' => "https://lesdamesduparc.com/verification/$memberToken", 'event_id' => $siteEventId]);
+    ok(($r['data']['result'] ?? '') === 'valid' && ($r['data']['ticket']['holder_name'] ?? '') === 'Participante 2', 'QR code de la carte de membre : billet de l\'adhérente pour cet événement validé');
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['code' => "https://lesdamesduparc.com/verification/$memberToken", 'event_id' => $eventId]);
+    ok(($r['data']['result'] ?? '') === 'invalid', 'Carte de membre sans billet pour l\'événement contrôlé : refusée');
+
+    // Billet acheté à la dernière minute : inconnu localement, l'application recharge les billets du site et l'accepte.
+    $C[5] = $code(5);
+    $f = $fake();
+    $f['tickets'][] = $tick(5, ['code' => $C[5]]);
+    $fake($f);
+    sleep(6);
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['code' => $C[5], 'event_id' => $siteEventId]);
+    ok(($r['data']['result'] ?? '') === 'valid', 'Billet acheté sur le site à la dernière minute : chargé et validé au premier scan', json_encode($r['data']));
+
+    // Site en panne : l'entrée est validée ici, la présence attend, puis part au retour du site.
+    $f = $fake();
+    $f['down'] = true;
+    $fake($f);
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['code' => $C[6], 'event_id' => $siteEventId]);
+    usleep(400000);
+    ok(($r['data']['result'] ?? '') === 'valid' && (int) $st($C[6])['site_pending'] === 1, 'Site indisponible : entrée validée, présence mise en attente');
+    $f = $fake();
+    $f['down'] = false;
+    $fake($f);
+    sleep(4);
+    $r = $c1->req('POST', '/api/sync.php', []);
+    ok(($r['data']['ok'] ?? false) && (int) $st($C[6])['site_pending'] === 0 && in_array($C[6], array_column($fake()['checkins'], 'code'), true), 'Retour du site : présence en attente transmise', json_encode($r['data']));
+
+    // Billet annulé sur le site après le dernier chargement : refusé dès le chargement suivant.
+    $f = $fake();
+    foreach ($f['tickets'] as &$t) if ($t['code'] === $C[7]) $t['status'] = 'cancelled';
+    unset($t);
+    $fake($f);
+    sleep(4);
+    $c1->req('POST', '/api/sync.php', []);
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['code' => $C[7], 'event_id' => $siteEventId]);
+    ok(($r['data']['result'] ?? '') === 'cancelled', 'Billet annulé sur le site entre deux chargements : refusé');
+
+    $tid = (int) $db->query('SELECT id FROM tickets WHERE token = ' . $db->quote($C[9]))->fetchColumn();
+    $r = $c1->req('POST', '/api/validate-ticket.php', ['ticket_id' => $tid, 'event_id' => $siteEventId]);
+    ok(($r['data']['result'] ?? '') === 'valid' && $db->query("SELECT method FROM check_logs WHERE ticket_id = $tid ORDER BY id DESC LIMIT 1")->fetchColumn() === 'list', 'Contrôle depuis la liste des participantes (journalisé « liste »)');
+    $r = $c1->req('GET', '/api/my-checks.php?event_id=' . $siteEventId);
+    ok(($r['data']['valid'] ?? 0) >= 5 && ($r['data']['rows'][0]['holder'] ?? '') === 'Participante 9', 'Historique « Mes contrôles » du contrôleur');
+
+    proc_terminate($proc);
+    proc_close($proc);
+    @unlink($stateFile);
+}
 
 section('Panne : accès refusé par défaut');
 // Base indisponible : on remplace la connexion par une base vide (aucune table) et on contrôle un billet.

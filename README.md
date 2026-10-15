@@ -1,24 +1,30 @@
 # Les Dames du Parc · Contrôle des billets
 
 Application web de contrôle des billets à l'entrée des événements de l'association **Les Dames du Parc**, supportrices du
-Paris Saint-Germain. Les contrôleurs scannent le QR code (ou saisissent le numéro) depuis leur téléphone, sans rien installer ;
-le serveur vérifie chaque billet et empêche toute double entrée, même quand plusieurs contrôleurs scannent le même billet au
-même instant.
+Paris Saint-Germain. Les contrôleurs scannent le **code-barres** du billet électronique (ou le QR code de la carte de membre, ou
+saisissent le numéro) depuis leur téléphone, sans rien installer ; le serveur vérifie chaque billet et empêche toute double
+entrée, même quand plusieurs contrôleurs scannent le même billet au même instant.
+
+**Lien avec lesdamesduparc.com** : à chaque ouverture, l'application charge tous les billets du site (puis toutes les 30 s), et
+chaque entrée validée est aussitôt renvoyée au site, où elle apparaît comme **présente** dans Admin > Événements > Présences
+(les autres participantes restent **absentes**). Voir [docs/INSTALLATION.md](docs/INSTALLATION.md#6-lien-avec-lesdamesduparccom).
 
 - **Serveur** : Apache 2.4 · **PHP** 8.2 ou supérieur · **Base** : MariaDB 10.4 ou supérieur
 - **Interface** : HTML5, CSS3, JavaScript natif (aucun framework, aucun Node.js)
-- **Lecture des QR codes** : détecteur natif du navigateur (Chrome/Android), ou [jsQR](https://github.com/cozmo/jsQR) (Safari/iPhone, Firefox), embarqués dans l'application
+- **Lecture des codes** : code-barres Code 128 des billets du site par le détecteur natif du navigateur (Chrome/Android) ou par
+  un lecteur dédié écrit pour l'application (Safari/iPhone, Firefox) ; QR codes par [ZXing](https://github.com/zxing-js/library),
+  embarqué dans l'application
 
 ## Fonctionnalités
 
 | Contrôleurs | Administrateurs |
 |---|---|
-| Connexion sécurisée | Tableau de bord en direct (billets valides, utilisés, annulés ; contrôles par résultat ; entrées par heure) |
-| Choix de l'événement contrôlé | Historique des contrôles filtrable (date, événement, contrôleur, résultat, billet) et export CSV |
-| **Scan du QR code** avec l'appareil photo | Recherche d'un billet (n°, code, titulaire, référence), détail, QR code, annulation, réactivation |
+| Connexion sécurisée, navigation par onglets Scanner · Historique · Profil | Tableau de bord en direct (billets valides, utilisés, annulés ; contrôles par résultat ; entrées par heure) |
+| Choix de l'événement contrôlé, compteur de présentes, état de la connexion | Historique des contrôles filtrable (date, événement, contrôleur, résultat, billet) et export CSV |
+| **Scan du code-barres** (ou du QR code) avec l'appareil photo, plein écran, lampe | Recherche d'un billet (n°, code, titulaire, référence), détail, QR code, annulation, réactivation |
 | **Saisie manuelle** du numéro (toujours disponible) | Import de billets CSV (doublons et lignes incorrectes signalés) et historique des imports |
-| Résultat plein écran, couleur, son et vibration | Création de billets, planche de QR codes imprimable, export CSV des billets |
-| | Événements (création, modification, désactivation) |
+| Résultat en couleur, son, vibration, billet suivant automatique | Création de billets, planche de QR codes imprimable, export CSV des billets |
+| Historique de ses contrôles ; liste des participantes présentes / absentes, entrée validée depuis la liste | Événements (création, modification, désactivation) |
 | | Comptes administrateurs et contrôleurs (création, modification, désactivation, suppression) |
 | | Journal des opérations sensibles |
 
@@ -32,7 +38,7 @@ passage) · **Billet invalide** (rouge : inconnu, mal formé ou signature falsif
 # 1. Base de données (voir docs/BASE-DE-DONNEES.md)
 mariadb -u ddp_controle -p ddp_controle < database/schema.sql
 # 2. Configuration
-cp config/config.example.php config/config.php    # puis renseigner base, adresse, secret QR
+cp config/config.example.php config/config.php    # puis renseigner base, adresse, secret QR, clé du site
 # 3. Premier administrateur (voir docs/PREMIER-ADMINISTRATEUR.md)
 php bin/create-admin.php presidente "Présidente"
 # 4. Faire pointer la racine du site (DocumentRoot) sur le dossier public/, en HTTPS
@@ -44,12 +50,12 @@ php bin/create-admin.php presidente "Présidente"
 public/        Racine du site (seul dossier servi par Apache) : pages, API, CSS, JavaScript, images
   api/         Points d'accès JSON (connexion, contrôle, statistiques, import, export, événements, comptes…)
   admin/       Pages d'administration
-  assets/      Feuilles de style, scripts, logo, bibliothèques QR (jsQR, qrcode-generator)
-src/           Logique métier : authentification, billets, CSV, statistiques, journal (classes DDP\…)
+  assets/      Feuilles de style, scripts (app.js, code128-reader.js…), logo, bibliothèques (ZXing, qrcode-generator)
+src/           Logique métier : authentification, billets, lien avec le site (SiteSync), CSV, statistiques, journal (classes DDP\…)
 templates/     Gabarit HTML commun
 config/        config.example.php (modèle sans secret) · config.php (secrets, jamais versionné)
-database/      schema.sql (script MariaDB complet) · demo-import.csv (exemple d'import)
-bin/           create-admin.php · demo-data.php · backup.sh · restore.sh
+database/      schema.sql (script MariaDB complet) · migrations/ (mise à jour d'une base existante) · demo-import.csv
+bin/           create-admin.php · demo-data.php · sync.php (synchronisation avec le site, tâche planifiée facultative) · backup.sh · restore.sh
 tests/         run-tests.php (tests de sécurité, de validation, de double scan et de contrôles simultanés)
 storage/       Journaux, sauvegardes et fichiers temporaires (hors accès public)
 docs/          Documentation
@@ -70,5 +76,5 @@ docs/          Documentation
 
 ## Licences des bibliothèques embarquées
 
-- jsQR 1.4.0 — Apache License 2.0 (`public/assets/vendor/jsQR.LICENSE.txt`)
+- ZXing (@zxing/library) 0.21.3 — Apache License 2.0 (`public/assets/vendor/zxing.LICENSE.txt`)
 - qrcode-generator 1.4.4 — MIT, © Kazuhiko Arase (`public/assets/vendor/qrcode-generator.LICENSE.txt`)

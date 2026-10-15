@@ -1,0 +1,10 @@
+{
+  "name": "Contrôle des billets · Les Dames du Parc",
+  "short_name": "Contrôle DDP",
+  "start_url": "/scan.php",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050507",
+  "theme_color": "#050507",
+  "icons": [{ "src": "/assets/img/logo.webp", "sizes": "512x512", "type": "image/webp" }]
+}

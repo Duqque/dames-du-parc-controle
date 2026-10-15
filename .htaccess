@@ -1,0 +1,14 @@
+# Si l'hébergement ne permet pas de choisir « public/ » comme racine du site, ce fichier redirige toutes les requêtes vers public/
+# et interdit l'accès direct au reste du projet (configuration, code, base, journaux…). La solution recommandée reste de faire
+# pointer la racine du site (DocumentRoot) directement sur le dossier public/.
+Options -Indexes
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(config|src|templates|storage|database|bin|tests|docs|vendor)(/|$) - [F,L]
+  RewriteRule (^|/)\. - [F,L]
+  RewriteCond %{REQUEST_URI} !^/public/
+  RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+<IfModule !mod_rewrite.c>
+  Require all denied
+</IfModule>

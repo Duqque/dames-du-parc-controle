@@ -1,0 +1,8 @@
+code;nom;reference
+DEMOIMPORT0001;Camille Martin;CMD-1001
+DEMOIMPORT0002;Léa Dubois;CMD-1002
+;Inès Petit;CMD-1003
+DEMOIMPORT0001;Doublon dans le fichier;CMD-1004
+abc;Code trop court;CMD-1005
+DEMOIMPORT0006;=HYPERLINK("http://exemple");CMD-1006
+DEMOIMPORT0007;Sarah Bernard;CMD-1007

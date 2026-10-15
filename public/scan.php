@@ -20,6 +20,7 @@ $I = [
     'close' => '<path d="M18 6 6 18M6 6l12 12"/>',
     'flash' => '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
     'search' => '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    'phone' => '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>',
     'sync' => '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/>',
 ];
 ?><!doctype html>
@@ -33,9 +34,11 @@ $I = [
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Contrôle des billets · Les Dames du Parc</title>
 <link rel="icon" href="/assets/img/logo.webp">
-<link rel="apple-touch-icon" href="/assets/img/logo.webp">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Contrôle DDP">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="stylesheet" href="/assets/css/app.css?v=6">
+<link rel="stylesheet" href="/assets/css/app.css?v=7">
 </head>
 <body class="app" data-user="<?= $e($user['display_name']) ?>" data-role="<?= $e($user['role']) ?>">
 <a class="skip" href="#views">Aller au contenu</a>
@@ -101,6 +104,7 @@ $I = [
     </div>
     <div class="rows">
       <button type="button" id="profile-event"><span>Événement<br><small id="profile-event-name">—</small></span><?= $icon($I['chev'], ' width="20" height="20"') ?></button>
+      <button type="button" data-install-guide><span>Installer l'application<br><small>sur l'écran d'accueil du téléphone</small></span><?= $icon($I['phone'], ' width="20" height="20"') ?></button>
       <button type="button" id="sync-now"><span>Billets du site<br><small id="profile-sync">—</small></span><?= $icon($I['sync'], ' width="20" height="20"') ?></button>
     </div>
     <div class="rows">
@@ -183,5 +187,6 @@ $I = [
 <script src="/assets/js/common.js?v=6"></script>
 <script src="/assets/js/code128-reader.js?v=6"></script>
 <script src="/assets/js/app.js?v=6"></script>
+<script src="/assets/js/install-guide.js?v=7"></script>
 </body>
 </html>

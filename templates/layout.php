@@ -26,8 +26,11 @@ $nav = $user && $user['role'] === 'admin' ? [
 <meta name="csrf-token" content="<?= $e(Auth::csrfToken()) ?>">
 <title><?= $e($title) ?> · Contrôle des billets · Les Dames du Parc</title>
 <link rel="icon" href="/assets/img/logo.webp">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Contrôle DDP">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="stylesheet" href="/assets/css/app.css?v=4">
+<link rel="stylesheet" href="/assets/css/app.css?v=7">
 </head>
 <body class="page-<?= $e($page) ?>" data-page="<?= $e($page) ?>">
 <a class="skip" href="#main">Aller au contenu</a>
@@ -39,6 +42,7 @@ $nav = $user && $user['role'] === 'admin' ? [
   <?php if ($user): ?>
   <div class="who">
     <span class="who-name"><?= $e($user['display_name']) ?><small><?= $user['role'] === 'admin' ? 'Administrateur' : 'Contrôleur' ?></small></span>
+    <button type="button" class="btn btn-ghost btn-sm" data-install-guide>Installer l'app</button>
     <button type="button" class="btn btn-ghost btn-sm" data-logout>Déconnexion</button>
   </div>
   <?php endif; ?>
@@ -55,6 +59,7 @@ $nav = $user && $user['role'] === 'admin' ? [
 </main>
 <div class="toast" role="status" aria-live="polite" hidden></div>
 <script src="/assets/js/common.js?v=4"></script>
+<?php if ($user): ?><script src="/assets/js/install-guide.js?v=7"></script><?php endif; ?>
 <?php foreach ($scripts ?? [] as $s): ?>
 <script src="/assets/js/<?= $e($s) ?>?v=4"></script>
 <?php endforeach; ?>

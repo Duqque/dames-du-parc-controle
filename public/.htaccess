@@ -22,6 +22,10 @@ AddType application/manifest+json .webmanifest
     Header set Referrer-Policy "no-referrer"
     Header set Cache-Control "public, max-age=604800"
   </FilesMatch>
+  # Service worker : toujours relu, pour que ses mises à jour soient prises en compte tout de suite.
+  <Files "sw.js">
+    Header set Cache-Control "no-cache"
+  </Files>
   Header always unset X-Powered-By
 </IfModule>
 

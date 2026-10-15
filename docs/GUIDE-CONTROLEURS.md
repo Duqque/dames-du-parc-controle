@@ -12,6 +12,22 @@
 L'application a trois onglets, en bas de l'écran : **Scanner** (accueil), **Historique** (vos contrôles et la liste des
 participantes) et **Profil** (événement, son, vibration, déconnexion).
 
+## Installer l'application sur le téléphone
+
+À la première connexion sur un téléphone, un tutoriel explique comment ajouter l'application à l'écran d'accueil, selon
+l'appareil détecté (on peut basculer entre iPhone et Android). Il reste accessible dans **Profil > Installer l'application**
+(et dans l'en-tête de l'administration).
+
+- **iPhone / iPad (Safari)** : bouton **Partager** (en bas au centre sur iPhone, en haut à droite sur iPad ; sinon touchez
+  d'abord « ⋯ »), puis **Sur l'écran d'accueil**, puis **Ajouter**. Depuis Chrome sur iPhone : **Partager** dans la barre
+  d'adresse, puis **Sur l'écran d'accueil** ; à défaut, ouvrir l'adresse dans Safari.
+- **Android (Chrome)** : bouton **Installer maintenant** du tutoriel quand il apparaît, sinon menu **⋮**, puis
+  **Installer l'application** (ou **Ajouter à l'écran d'accueil**). **Samsung Internet** : menu **≡**, **Ajouter la page à**,
+  **Écran d'accueil**.
+
+Ouvrez ensuite toujours l'application depuis l'icône « Contrôle DDP » : elle s'affiche en plein écran. Au premier scan,
+autorisez l'accès à l'appareil photo.
+
 ## Contrôler un billet
 
 ### Avec l'appareil photo

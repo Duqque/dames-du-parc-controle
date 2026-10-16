@@ -115,6 +115,10 @@ Voir [PREMIER-ADMINISTRATEUR.md](PREMIER-ADMINISTRATEUR.md).
 
 ## 9. Mise à jour de l'application
 
+**Version RGPD (adresses IP pseudonymisées)** : importez une fois `database/migrations/003_rgpd_ip.sql`
+(phpMyAdmin > Importer, ou `mariadb … < database/migrations/003_rgpd_ip.sql`). Il masque les adresses IP déjà enregistrées ;
+l'application n'enregistre plus qu'une empreinte chiffrée (`ip~…`) et n'affiche plus aucune adresse.
+
 Sauvegardez la base (`sh bin/backup.sh`), remplacez les fichiers en conservant `config/config.php` et `storage/`, importez les
 nouvelles migrations de `database/migrations/` (une seule fois chacune, dans l'ordre), puis rechargez une page : les fichiers CSS
 et JavaScript portent un numéro de version (`?v=…`) qui force leur rafraîchissement.

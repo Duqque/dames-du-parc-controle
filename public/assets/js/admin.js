@@ -303,7 +303,7 @@
   /* ---------- Journal ---------- */
   async function audit() {
     const { data } = await api("/api/audit.php");
-    $("#audit tbody").innerHTML = data && data.rows && data.rows.length ? data.rows.map((r) => `<tr><td>${esc(r.at)}</td><td>${esc(r.action)}</td><td>${esc(r.target || "")}</td><td class="mono"><small>${esc(r.details || "")}</small></td><td>${esc(r.by || "")}</td><td>${esc(r.ip || "")}</td></tr>`).join("") : empty(6, "Journal vide.");
+    $("#audit tbody").innerHTML = data && data.rows && data.rows.length ? data.rows.map((r) => `<tr><td>${esc(r.at)}</td><td>${esc(r.action)}</td><td>${esc(r.target || "")}</td><td class="mono"><small>${esc(r.details || "")}</small></td><td>${esc(r.by || "")}</td></tr>`).join("") : empty(6, "Journal vide.");
   }
 
   const routes = { "admin-dashboard": dashboard, "admin-checks": checks, "admin-tickets": tickets, "admin-import": importPage, "admin-events": events, "admin-users": users, "admin-audit": audit };

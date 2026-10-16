@@ -33,7 +33,19 @@ final class Http
         return in_array($_SERVER['REMOTE_ADDR'] ?? '', $proxies, true) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
     }
 
+    /**
+     * Adresse IP pseudonymisée (RGPD) : empreinte HMAC de l'adresse avec la clé secrète de l'application. Elle suffit pour limiter
+     * les tentatives de connexion, sans jamais conserver ni afficher l'adresse réelle.
+     */
     public static function clientIp(): string
+    {
+        $secret = (string) App::config('qr_secret', 'ddp');
+        $mac = hash_hmac('sha256', 'ip:' . self::rawClientIp(), $secret, true);
+        return 'ip~' . substr(rtrim(strtr(base64_encode($mac), '+/', '-_'), '='), 0, 16);
+    }
+
+    /** Adresse réelle, jamais enregistrée (lecture interne uniquement). */
+    private static function rawClientIp(): string
     {
         $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
         $proxies = (array) App::config('trusted_proxies', []);

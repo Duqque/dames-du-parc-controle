@@ -108,7 +108,7 @@ final class Auth
         $ip = Http::clientIp();
         $username = mb_strtolower(trim($username));
         if (RateLimiter::loginBlocked($username, $ip)) {
-            Audit::log('login_blocked', $username, null, ['ip' => $ip]);
+            Audit::log('login_blocked', $username, null);
             return [false, 'Trop de tentatives. Patientez quelques minutes avant de réessayer.', null, 429];
         }
         $st = App::db()->prepare('SELECT id, username, display_name, role, is_active, password_hash FROM users WHERE username = ?');
@@ -135,7 +135,7 @@ final class Auth
         ];
         App::db()->prepare('UPDATE users SET last_login_at = UTC_TIMESTAMP() WHERE id = ?')->execute([$u['id']]);
         self::$user = null;
-        Audit::log('login', $u['username'], (int) $u['id'], ['ip' => $ip]);
+        Audit::log('login', $u['username'], (int) $u['id']);
         unset($u['password_hash']);
         return [true, 'Connexion réussie.', $u, 200];
     }

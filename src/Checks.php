@@ -141,7 +141,7 @@ final class Checks
                                     $where ORDER BY c.id");
         $st->execute($args);
         while ($r = $st->fetch()) {
-            yield [App::localTime($r['created_at']), self::LABELS[$r['result']] ?? $r['result'], $r['method'] === 'manual' ? 'Saisie' : 'Scan', $r['event_name'], $r['ticket_id'], $r['holder_name'], $r['reference'], $r['code_hint'], $r['username'], $r['ip_address']];
+            yield [App::localTime($r['created_at']), self::LABELS[$r['result']] ?? $r['result'], $r['method'] === 'manual' ? 'Saisie' : 'Scan', $r['event_name'], $r['ticket_id'], $r['holder_name'], $r['reference'], $r['code_hint'], $r['username']];
         }
     }
 }
